@@ -1,0 +1,35 @@
+2026-02-01 20:06:03,463 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:06:03,463 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | 你好
+2026-02-01 20:06:15,081 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:06:15,081 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | 我是jacob
+2026-02-01 20:06:25,146 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:06:25,146 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | 我是谁？
+2026-02-01 20:15:39,077 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:15:39,089 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | hello， this is wuxi
+2026-02-01 20:18:01,425 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:18:01,425 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | hi
+2026-02-01 20:20:38,077 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:20:38,077 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | hi
+2026-02-01 20:20:49,927 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:20:49,927 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | my name is wuxi
+2026-02-01 20:20:59,068 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:20:59,068 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | what is my name
+2026-02-01 20:21:38,442 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:21:38,443 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | what is your name?
+2026-02-01 20:39:53,896 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:39:53,896 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | hi
+2026-02-01 20:40:03,203 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:40:03,203 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | 我是五溪
+2026-02-01 20:40:12,573 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:40:12,574 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | 我叫啥名字
+2026-02-01 20:40:13,974 - agent - INFO - middleware.py:19 - [tool monitor]执行工具：get_user_id
+2026-02-01 20:40:13,974 - agent - INFO - middleware.py:20 - [tool monitor]传入参数：{}
+2026-02-01 20:40:13,975 - agent - INFO - middleware.py:24 - [tool monitor]工具get_user_id调用成功
+2026-02-01 20:40:14,030 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有3条消息。
+2026-02-01 20:40:14,030 - agent - DEBUG - middleware.py:42 - [log_before_model]ToolMessage | 1005
+2026-02-01 20:44:00,372 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有1条消息。
+2026-02-01 20:44:00,373 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | 你好
+2026-02-01 20:44:12,304 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有3条消息。
+2026-02-01 20:44:12,304 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | 我叫张三
+2026-02-01 20:44:17,267 - agent - INFO - middleware.py:40 - [log_before_model]即将调用模型，带有5条消息。
+2026-02-01 20:44:17,267 - agent - DEBUG - middleware.py:42 - [log_before_model]HumanMessage | 我叫啥名字
