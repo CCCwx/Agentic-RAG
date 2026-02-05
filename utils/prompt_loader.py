@@ -44,7 +44,11 @@ def load_report_prompts():
         logger.error(f"[load_report_prompts]解析报告生成提示词出错，{str(e)}")
         raise e
 
+def load_knowledge_refinement_prompt():
+    path = get_abs_path(prompts_conf["knowledge_refinement_prompt_path"])
+    return open(path, "r", encoding="utf-8").read()
 
 if __name__ == '__main__':
     print(load_report_prompts())
+
 
