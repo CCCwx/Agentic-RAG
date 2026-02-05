@@ -1,0 +1,8 @@
+Extract the core knowledge from the following reference documents. Output only the key bullet points that are relevant to answering the user's question. Do not add any content not present in the documents. Keep each bullet concise.
+
+User Question: {query}
+
+Reference Documents:
+{context}
+
+Output format: plain text bullet points, one per line, each starting with "- ".
