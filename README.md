@@ -1,8 +1,8 @@
 # Robust Agentic RAG v2.0 🤖
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![LangChain](https://img.shields.io/badge/LangChain-0.3-green)](https://www.langchain.com/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-0.2-orange)](https://langchain-ai.github.io/langgraph/)
+[![LangChain](https://img.shields.io/badge/LangChain-1.2.9-green)](https://www.langchain.com/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1.0.8-orange)](https://langchain-ai.github.io/langgraph/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-App-red)](https://streamlit.io/)
 
 A robust **Agentic RAG** system built with **LangGraph**. Unlike traditional linear RAG chains, this system utilizes a graph-based orchestration to provide adaptive capabilities such as **Intent Routing**, **Corrective RAG (CRAG)**, **Web Search Fallback**, **Hallucination Detection**, and **Utility Checks**. It aims to solve common RAG issues like retrieval inaccuracy, hallucinations, and context insufficiency.
