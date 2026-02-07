@@ -1,0 +1,7 @@
+Given the user query below, determine whether retrieval from a knowledge base is necessary to answer it.
+- "No Retrieval": small talk, greetings, simple logic/calculation, or when the question can be answered without external documents.
+- "Retrieval Needed": factual questions, product/domain knowledge, or when documents are needed to answer accurately.
+
+Query: {query}
+
+Output only one of: No Retrieval | Retrieval Needed
