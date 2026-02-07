@@ -44,11 +44,33 @@ def load_report_prompts():
         logger.error(f"[load_report_prompts]解析报告生成提示词出错，{str(e)}")
         raise e
 
+#从向量数据库回来后精简知识
 def load_knowledge_refinement_prompt():
     path = get_abs_path(prompts_conf["knowledge_refinement_prompt_path"])
     return open(path, "r", encoding="utf-8").read()
 
+#一开始的routing
+def load_intent_routing_prompt():
+    path = get_abs_path(prompts_conf["intent_routing_prompt_path"])
+    return open(path, "r", encoding="utf-8").read()
+
+#重写query
+def load_query_expansion_prompt():
+    path = get_abs_path(prompts_conf["query_expansion_prompt_path"])
+    return open(path, "r", encoding="utf-8").read()
+
+#生成答案时
+def load_generation_prompt():
+    path = get_abs_path(prompts_conf["generation_prompt_path"])
+    return open(path, "r", encoding="utf-8").read()
+
+#utility check
+def load_utility_check_prompt():
+    path = get_abs_path(prompts_conf["utility_check_prompt_path"])
+    return open(path, "r", encoding="utf-8").read()
+    
 if __name__ == '__main__':
     print(load_report_prompts())
+
 
 
