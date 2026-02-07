@@ -4,3 +4,8 @@ rag_summarize_prompt_path: prompts/rag_summarize.txt
 report_prompt_path: prompts/report_prompt.txt
 
 knowledge_refinement_prompt_path: prompts/knowledge_refinement.txt
+determine_whether_need_retrival_prompt_path: prompts/Retrieval_Response.txt
+generation_prompt_path: prompts/generation.txt
+utility_check_prompt_path: prompts/utility_check.txt
+intent_routing_prompt_path: prompts/intent_routing.txt
+query_expansion_prompt_path: prompts/query_expansion.txt
