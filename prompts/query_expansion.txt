@@ -1,0 +1,5 @@
+Given the original user query, generate 1 to 2 rewritten or expanded search queries that help retrieve relevant documents from a vector store. Keep queries concise and focused on key concepts.
+
+Original Query: {query}
+
+Output a JSON object with a single key "queries" whose value is a list of 1 or 2 query strings. Example: {{"queries": ["query one", "query two"]}}
