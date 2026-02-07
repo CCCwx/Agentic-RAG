@@ -1,0 +1,7 @@
+Does the following answer adequately address and resolve the user's question? Consider whether the answer is relevant, complete, and useful for the user's intent.
+
+User Question: {query}
+
+Answer: {answer}
+
+Output only one of: Useful | Not Useful
