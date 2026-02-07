@@ -1,2 +1,3 @@
 chat_model_name: gemini-2.5-flash
 embedding_model_name: models/text-embedding-004
+reranker_model_name: BAAI/bge-reranker-base
