@@ -66,10 +66,13 @@ def web_search(query_list: List[str]) -> List[Document]:
         if not (q and str(q).strip()):
             continue
         try:
-            try:
-                result = search_tool.invoke({"query": q})
-            except (TypeError, KeyError):
-                result = search_tool.invoke({"input": q})
+           # Bright Data MCP 工具仅支持异步调用，用 ainvoke + _run_async 在同步上下文中执行
+           async def _call_tool():
+                try:
+                    return await search_tool.ainvoke({"query": q})
+                except (TypeError, KeyError):
+                    return await search_tool.ainvoke({"input": q})
+            result = _run_async(_call_tool())
         except Exception as e:
             logger.warning(f"[web_search] query '{q[:50]}...' failed: {e}")
             continue
@@ -77,3 +80,4 @@ def web_search(query_list: List[str]) -> List[Document]:
             text = result if isinstance(result, str) else str(result)
             docs.append(Document(page_content=text.strip(), metadata={"source": "web_search", "query": q}))
     return docs
+
