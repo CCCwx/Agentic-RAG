@@ -3,9 +3,14 @@ Web search using Bright Data MCP (mcp_server.py).
 Used in Stage 3: Correction & Web Search.
 """
 import asyncio
+import os
+import sys
 from typing import List
 from langchain_core.documents import Document
 from utils.logger_handler import logger
+
+# Bright Data 代理可能较慢，延长单次搜索等待时间（秒）；可通过环境变量 WEB_SEARCH_TIMEOUT 覆盖
+WEB_SEARCH_TIMEOUT_SECONDS = int(os.environ.get("WEB_SEARCH_TIMEOUT", "120"))
 
 # Lazy cache of MCP tools
 _mcp_tools = None
@@ -62,22 +67,44 @@ def web_search(query_list: List[str]) -> List[Document]:
         logger.warning("[web_search] No search tool found from MCP")
         return []
     docs = []
+    total = len([q for q in query_list if q and str(q).strip()])
+    sys.stdout.write(f"\n[终端] 阶段3 网络搜索开始（共 {total} 条，单条最多等待 {WEB_SEARCH_TIMEOUT_SECONDS}s）...\n")
+    sys.stdout.flush()
+    idx = 0
     for q in query_list:
         if not (q and str(q).strip()):
             continue
+        idx += 1
+        short_q = (q[:40] + "…") if len(q) > 40 else q
+        sys.stdout.write(f"[终端] 正在搜索 ({idx}/{total}): {short_q}\n")
+        sys.stdout.flush()
         try:
-           # Bright Data MCP 工具仅支持异步调用，用 ainvoke + _run_async 在同步上下文中执行
-           async def _call_tool():
+            async def _call_tool(qq=q):
                 try:
-                    return await search_tool.ainvoke({"query": q})
+                    return await search_tool.ainvoke({"query": qq})
                 except (TypeError, KeyError):
-                    return await search_tool.ainvoke({"input": q})
-            result = _run_async(_call_tool())
+                    return await search_tool.ainvoke({"input": qq})
+            result = _run_async(
+                asyncio.wait_for(_call_tool(), timeout=WEB_SEARCH_TIMEOUT_SECONDS)
+            )
+        except asyncio.TimeoutError:
+            sys.stdout.write(f"[终端] 本条搜索超时（{WEB_SEARCH_TIMEOUT_SECONDS}s），跳过\n")
+            sys.stdout.flush()
+            logger.warning(
+                f"[web_search] query '{q[:50]}...' timed out after {WEB_SEARCH_TIMEOUT_SECONDS}s"
+            )
+            continue
         except Exception as e:
+            sys.stdout.write(f"[终端] 本条搜索失败: {e}\n")
+            sys.stdout.flush()
             logger.warning(f"[web_search] query '{q[:50]}...' failed: {e}")
             continue
+        sys.stdout.write("[终端] 本条搜索完成\n")
+        sys.stdout.flush()
         if result:
             text = result if isinstance(result, str) else str(result)
             docs.append(Document(page_content=text.strip(), metadata={"source": "web_search", "query": q}))
+    sys.stdout.write(f"[终端] 阶段3 网络搜索结束，得到 {len(docs)} 条结果\n")
+    sys.stdout.flush()
     return docs
 
