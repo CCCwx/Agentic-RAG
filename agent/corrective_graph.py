@@ -225,23 +225,26 @@ def stage2_evaluate_crag(state: RAGState) -> RAGState:
 
 # --- Stage 3: Web Search ---
 def stage3_web_search(state: RAGState) -> RAGState:
+    query = state["query"]
     query_list = state["query_list"]
     web_results = web_search(query_list)
     decision = state.get("crag_decision", "Incorrect")
     refined = state.get("refined_context", "")
-    # Path A: Incorrect -> documents = web_results only
-    # Path B: Ambiguous (or backtrack) -> documents = refined + web_results
+    # 对 web results 做 knowledge refinement，控制上下文长度
+    refined_web = refine_documents(query, web_results) if web_results else ""
+    # Path A: Incorrect -> context 只用提炼后的网络结果
+    # Path B: Ambiguous (or backtrack) -> context = 向量库提炼 + 网络结果提炼
     if decision == "Incorrect":
         new_docs = web_results
-        new_context = "\n\n".join(d.page_content for d in web_results)
+        new_context = refined_web
     else:
         new_docs = state.get("documents", []) + web_results
-        new_context = (refined + "\n\n" + "\n\n".join(d.page_content for d in web_results)) if web_results else refined
+        new_context = (refined + "\n\n" + refined_web).strip() if refined_web else refined
     return {
         **state,
         "web_results": web_results,
         "documents": new_docs,
-        "refined_context": new_context.strip(),
+        "refined_context": new_context,
         "need_web_search": False,
         "next_stage": "generate",
     }
@@ -471,3 +474,4 @@ if __name__ == "__main__":
     out = run_rag("小户型适合哪些扫地机器人")
 
     print(out)
+
