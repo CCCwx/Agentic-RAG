@@ -269,14 +269,21 @@ def stage4_generate(state: RAGState) -> RAGState:
 
 # --- Stage 5: Reflection — Support Check (hallucination) ---
 def stage5_support_check(state: RAGState) -> RAGState:
+    """用「生成时实际喂给模型的 context」与 answer 算分，而不是 raw documents。"""
     answer = state["answer"]
+    # 与 stage4_generate 一致：优先 refined_context，否则用 documents 拼接
+    refined = state.get("refined_context") or ""
     docs = state.get("documents", [])
-    doc_texts = [d.page_content for d in docs]
-    if not doc_texts:
+    if refined:
+        context_used = refined
+    elif docs:
+        context_used = "\n\n".join(d.page_content for d in docs)
+    else:
         return {**state, "support_scores": [], "next_stage": "utility_check"}
     reranker = _get_reranker()
-    scores = reranker.support_scores(answer, doc_texts)
-    supported = reranker.is_supported(answer, doc_texts, threshold=SUPPORT_THRESHOLD)
+    # (answer, context_used) 一对，得到一个分数
+    scores = reranker.support_scores(answer, [context_used])
+    supported = reranker.is_supported(answer, [context_used], threshold=SUPPORT_THRESHOLD)
     halluci = state.get("halluci_generate_counter", 0)
     if not supported and halluci < MAX_HALLUCI_GENERATE:
         return {
@@ -474,4 +481,5 @@ if __name__ == "__main__":
     out = run_rag("小户型适合哪些扫地机器人")
 
     print(out)
+
 
