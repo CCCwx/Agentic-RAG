@@ -222,7 +222,6 @@ def stage2_evaluate_crag(state: RAGState) -> RAGState:
         "next_stage": "web_search" if need_web else "generate",
     }
 
-
 # --- Stage 3: Web Search ---
 def stage3_web_search(state: RAGState) -> RAGState:
     query = state["query"]
@@ -231,7 +230,11 @@ def stage3_web_search(state: RAGState) -> RAGState:
     decision = state.get("crag_decision", "Incorrect")
     refined = state.get("refined_context", "")
     # 对 web results 做 knowledge refinement，控制上下文长度
+    sys.stdout.write("\n[终端] 阶段3 正在对网络结果做知识提炼（LLM 可能较慢，请稍候）...\n")
+    sys.stdout.flush()
     refined_web = refine_documents(query, web_results) if web_results else ""
+    sys.stdout.write("[终端] 阶段3 知识提炼完成\n")
+    sys.stdout.flush()
     # Path A: Incorrect -> context 只用提炼后的网络结果
     # Path B: Ambiguous (or backtrack) -> context = 向量库提炼 + 网络结果提炼
     if decision == "Incorrect":
@@ -479,7 +482,7 @@ def _initial_state(query: str) -> RAGState:
 
 if __name__ == "__main__":
     out = run_rag("小户型适合哪些扫地机器人")
-
     print(out)
+
 
 
