@@ -185,9 +185,18 @@ def stage2_evaluate_crag(state: RAGState) -> RAGState:
             "need_web_search": True,
             "next_stage": "web_search",
         }
+    #用于追踪
+    sys.stdout.write("\n[终端] 阶段2 CRAG 评估中（Reranker 首次加载或计分可能较慢，请稍候）...\n")
+    sys.stdout.flush()
     reranker = _get_reranker()
     doc_texts = [d.page_content for d in docs]
-    max_score = reranker.crag_max_score(query, doc_texts)
+     # 原始 query + documents 与 rewrite_query_1 + documents 都评估，取最高分
+    score_orig = reranker.crag_max_score(query, doc_texts)
+    rew1 = state.get("rewritten_query_1") or query
+    score_rew1 = reranker.crag_max_score(rew1, doc_texts)
+    max_score = max(score_orig, score_rew1)
+    sys.stdout.write("[终端] CRAG 计分完成，开始知识提炼...\n")
+    sys.stdout.flush()
     if max_score > CRAG_CORRECT_THRESHOLD:
         decision = "Correct"
         need_web = False
@@ -460,4 +469,5 @@ def _initial_state(query: str) -> RAGState:
 
 if __name__ == "__main__":
     out = run_rag("小户型适合哪些扫地机器人")
+
     print(out)
