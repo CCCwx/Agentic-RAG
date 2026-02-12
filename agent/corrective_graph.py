@@ -28,8 +28,9 @@ import json
 import sys
 
 # --- State ---
-class RAGState(TypedDict):
-    query: str #用户输入的最初始的查询
+class RAGState(TypedDict, total=False):
+    chat_history: str  # 多轮对话历史（格式化为字符串），用于意图路由与生成
+    query: str
     query_list: List[str] #初始query + rewrite query
     intent: str #对用于意图的分类
     documents: List[Document] #stage1的从向量数据库检索到的原始文档列表
@@ -127,13 +128,29 @@ def _get_reranker():
     return _reranker
 
 
+def _format_chat_history(messages: list) -> str:
+    """将 [{role, content}, ...] 格式化为字符串，供意图路由与生成使用。"""
+    if not messages:
+        return "(No chat history.)"
+    lines = []
+    for m in messages:
+        role = (m.get("role") or "user").strip()
+        content = (m.get("content") or "").strip()
+        if not content:
+            continue
+        label = "user" if role == "user" else "AI Assistant"
+        lines.append(f"{label}: {content}")
+    return "\n".join(lines) if lines else "(No )"
+
+
 # --- Stage 1: Pre-Retrieval & Routing ---
 def stage1_routing(state: RAGState) -> RAGState:
     query = state["query"]
+    chat_history = state.get("chat_history") or "(No chat history.)"
     prompt_text = load_intent_routing_prompt()
     prompt = PromptTemplate.from_template(prompt_text)
     chain = prompt | chat_model.with_structured_output(IntentResponse)
-    result = chain.invoke({"query": query})
+    result = chain.invoke({"query": query, "chat_history": chat_history})
     intent = "No Retrieval" if result and "No Retrieval" in (result.response or "") else "Retrieval Needed"
     if intent == "No Retrieval":
         return {
@@ -185,12 +202,11 @@ def stage2_evaluate_crag(state: RAGState) -> RAGState:
             "need_web_search": True,
             "next_stage": "web_search",
         }
-    #用于追踪
     sys.stdout.write("\n[终端] 阶段2 CRAG 评估中（Reranker 首次加载或计分可能较慢，请稍候）...\n")
     sys.stdout.flush()
     reranker = _get_reranker()
     doc_texts = [d.page_content for d in docs]
-     # 原始 query + documents 与 rewrite_query_1 + documents 都评估，取最高分
+    # 原始 query + documents 与 rewrite_query_1 + documents 都评估，取最高分
     score_orig = reranker.crag_max_score(query, doc_texts)
     rew1 = state.get("rewritten_query_1") or query
     score_rew1 = reranker.crag_max_score(rew1, doc_texts)
@@ -222,6 +238,7 @@ def stage2_evaluate_crag(state: RAGState) -> RAGState:
         "next_stage": "web_search" if need_web else "generate",
     }
 
+
 # --- Stage 3: Web Search ---
 def stage3_web_search(state: RAGState) -> RAGState:
     query = state["query"]
@@ -229,7 +246,7 @@ def stage3_web_search(state: RAGState) -> RAGState:
     web_results = web_search(query_list)
     decision = state.get("crag_decision", "Incorrect")
     refined = state.get("refined_context", "")
-    # 对 web results 做 knowledge refinement，控制上下文长度
+    # 对 web results 做 knowledge refinement，控制上下文长度（LLM 调用，可能较慢）
     sys.stdout.write("\n[终端] 阶段3 正在对网络结果做知识提炼（LLM 可能较慢，请稍候）...\n")
     sys.stdout.flush()
     refined_web = refine_documents(query, web_results) if web_results else ""
@@ -238,7 +255,7 @@ def stage3_web_search(state: RAGState) -> RAGState:
     # Path A: Incorrect -> context 只用提炼后的网络结果
     # Path B: Ambiguous (or backtrack) -> context = 向量库提炼 + 网络结果提炼
     if decision == "Incorrect":
-        new_docs = web_results
+        new_docs = web_results #这里的文档列表是网络查询到的文档列表（没有进行精炼的raw数据）
         new_context = refined_web
     else:
         new_docs = state.get("documents", []) + web_results
@@ -256,13 +273,18 @@ def stage3_web_search(state: RAGState) -> RAGState:
 # --- Stage 4: Generation ---
 def stage4_generate(state: RAGState) -> RAGState:
     query = state["query"]
+    chat_history = state.get("chat_history") or "(No chat history.)"
     context = state.get("refined_context") or ""
     if not context and state.get("documents"):
         context = "\n\n".join(d.page_content for d in state["documents"])
     prompt_text = load_generation_prompt()
     prompt = PromptTemplate.from_template(prompt_text)
     chain = prompt | chat_model | StrOutputParser()
-    answer = chain.invoke({"query": query, "context": context or "(No reference documents.)"})
+    answer = chain.invoke({
+        "query": query,
+        "chat_history": chat_history,
+        "context": context or "(No reference documents.)",
+    })
     return {
         **state,
         "answer": answer or "",
@@ -409,21 +431,31 @@ def build_rag_graph():
     return workflow.compile(checkpointer=MemorySaver())
 
 
-def run_rag(query: str, thread_id: str | None = None) -> str:
+def run_rag(
+    query: str,
+    thread_id: str | None = None,
+    chat_history: list | None = None,
+) -> str:
     graph = build_rag_graph()
     config = {"configurable": {"thread_id": thread_id or "default"}}
-    final_state = graph.invoke(_initial_state(query), config=config)
+    history_str = _format_chat_history(chat_history or [])
+    final_state = graph.invoke(_initial_state(query, chat_history=history_str), config=config)
     return (final_state or {}).get("final_answer") or (final_state or {}).get("answer") or ""
 
 
-def run_rag_stream(query: str, thread_id: str | None = None):
+def run_rag_stream(
+    query: str,
+    thread_id: str | None = None,
+    chat_history: list | None = None,
+):
     """
     Run RAG graph with real-time workflow progress.
-    Yields progress lines (当前阶段: ...) as each node runs, then yields the final answer.
+    chat_history: 多轮对话历史，格式 [{role, content}, ...]，用于意图路由与生成。
     """
     graph = build_rag_graph()
     config = {"configurable": {"thread_id": thread_id or "default"}}
-    initial: RAGState = _initial_state(query)
+    history_str = _format_chat_history(chat_history or [])
+    initial: RAGState = _initial_state(query, chat_history=history_str)
     sys.stdout.write(f"\n[终端] 当前 query: {query}\n")
     sys.stdout.flush()
     try:
@@ -456,9 +488,10 @@ def run_rag_stream(query: str, thread_id: str | None = None):
         yield char
 
 
-def _initial_state(query: str) -> RAGState:
+def _initial_state(query: str, chat_history: str = "") -> RAGState:
     return {
         "query": query,
+        "chat_history": chat_history or "(无)",
         "query_list": [],
         "intent": "",
         "documents": [],
@@ -483,6 +516,3 @@ def _initial_state(query: str) -> RAGState:
 if __name__ == "__main__":
     out = run_rag("小户型适合哪些扫地机器人")
     print(out)
-
-
-
