@@ -1,7 +1,16 @@
-Given the user query below, determine whether retrieval from a knowledge base is necessary to answer it.
-- "No Retrieval": small talk, greetings, simple logic/calculation, or when the question can be answered without external documents.
-- "Retrieval Needed": factual questions, product/domain knowledge, or when documents are needed to answer accurately.
+Given the conversation history (if any) and the current user query, determine whether retrieval from a knowledge base or web search is necessary to answer.
 
-Query: {query}
+Conversation history (recent turns):
+{chat_history}
+
+Current user query: {query}
+
+- "No Retrieval": Use when the question can be answered without external documents. Include:
+  * Greetings, small talk, thanks, goodbye.
+  * Questions about the USER'S OWN identity or information THEY just provided in this conversation (e.g. "what's my name?", "我叫啥?", "what did I say?", "我刚才说了什么?").
+  * Simple logic, math, or common sense that does not need a knowledge base.
+  * Any question that clearly refers to the current conversation or the user's own statements.
+- "Retrieval Needed": Use only when the user is asking about external facts, product/domain knowledge, or topics that require documents or web search to answer accurately.
 
 Output only one of: No Retrieval | Retrieval Needed
+
