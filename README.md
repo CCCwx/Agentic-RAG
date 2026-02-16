@@ -28,22 +28,80 @@ The system implements a state machine using LangGraph:
 
 ```mermaid
 graph TD
-    Start([Start]) --> Routing[Stage 1: Intent Routing & Expansion]
+    %% --- 样式定义 ---
+    classDef db fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef ext fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef process fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
+    classDef decision fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef term fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px;
+
+    %% --- 外部实体与数据库 ---
+    User(["👤 User / Client"])
+    Postgres["🗄️ PostgreSQL\nLong-term Memory"]:::db
+    Chroma["🗄️ ChromaDB\nVector Store"]:::db
+    %% 修复：移除了多余的右括号，并添加了双引号
+    WebSearch[["🌐 Web Search\n(Bright Data / MCP)"]]:::ext
+
+    %% --- 流程开始 ---
+    User --> |"Query"| Start([Start])
+    Postgres -.-> |"Load Chat History"| Start
+
+    %% --- Stage 1: 意图与路由 ---
+    subgraph Stage1 [Stage 1: Pre-Retrieval]
+        Start --> Intent{"Intent Routing"}:::decision
+        Intent -- "Chat / Self-Ref" --> NoRetrieval["Pass Through"]:::process
+        Intent -- "External Knowledge" --> Rewriter["Query Expansion\n(Generate 2 Queries)"]:::process
+    end
+
+    %% --- Stage 2: 检索与评估 ---
+    subgraph Stage2 [Stage 2: Retrieval & Evaluation]
+        Rewriter --> MultiRetrieve["Multi-Query Retrieval"]:::process
+        MultiRetrieve <--> |"Fetch Top-k Docs"| Chroma
+        
+        MultiRetrieve --> CRAG{"CRAG Evaluator\n(Reranker Model)"}:::decision
+        CRAG -- "Correct (>0.7)" --> FilterDocs["Keep High Quality Docs"]:::process
+        CRAG -- "Ambiguous (0.3-0.7)" --> WebTrigger["Keep Partial + Trigger Search"]:::process
+        CRAG -- "Incorrect (<0.3)" --> DropDocs["Drop Docs + Trigger Search"]:::process
+    end
+
+    %% --- Stage 3: 网络搜索 ---
+    subgraph Stage3 [Stage 3: Web Search Augmentation]
+        WebTrigger --> CallMCP["Call MCP Client"]:::process
+        DropDocs --> CallMCP
+        CallMCP <--> |"Search Query"| WebSearch
+        CallMCP --> Refine["Knowledge Refinement\n(LLM Summarization)"]:::process
+    end
+
+    %% --- Stage 4: 生成 ---
+    subgraph Stage4 [Stage 4: Generation]
+        NoRetrieval --> Generator["LLM Generator"]:::process
+        FilterDocs --> Generator
+        Refine --> Generator
+        
+        Postgres -.-> |"Inject History Context"| Generator
+    end
+
+    %% --- Stage 5: 反思与闭环 ---
+    subgraph Stage5 [Stage 5: Reflection Loop]
+        Generator --> SupportCheck{"Hallucination Check\n(Reranker)"}:::decision
+        
+        SupportCheck -- "Unsupported (<0.3)" --> RetryGen["Retry Generation\n(Max 2 times)"]:::process
+        RetryGen --> Generator
+        
+        SupportCheck -- "Supported" --> UtilityCheck{"Utility Check\n(LLM Judge)"}:::decision
+        
+        UtilityCheck -- "Not Useful" --> RewriteLoop["Rewrite Query (v2)"]:::process
+        RewriteLoop --> CheckSim{"Similarity Check"}:::decision
+        
+        CheckSim -- "High Sim (Loop)" --> ForceWeb["Force Web Search"]:::process
+        CheckSim -- "New Angle" --> Backtrack["Backtrack to Stage 2"]:::process
+        
+        Backtrack --> MultiRetrieve
+        ForceWeb --> CallMCP
+    end
+
+    %% --- 结束 ---
+    UtilityCheck -- "Useful" --> End([End / Final Answer]):::term
     
-    Routing -- No Retrieval --> Generate
-    Routing -- Need Retrieval --> Retrieve[Stage 2: Vector Store Retrieval]
-    
-    Retrieve --> CRAG[Stage 2: CRAG Evaluator]
-    
-    CRAG -- Correct --> Generate
-    CRAG -- Ambiguous/Incorrect --> WebSearch[Stage 3: Web Search]
-    
-    WebSearch --> Generate[Stage 4: Generation]
-    
-    Generate --> SupportCheck[Stage 5: Support/Hallucination Check]
-    
-    SupportCheck -- Hallucination Detected (Retry) --> Generate
-    SupportCheck -- Supported --> UtilityCheck[Stage 5: Utility Check]
-    
-    UtilityCheck -- Useful --> End([End])
-    UtilityCheck -- Not Useful (Rewrite Query) --> Retrieve
+    %% --- 存储记忆 ---
+    End -.-> |"Save Turn"| Postgres
