@@ -1,0 +1,25 @@
+# RAG & LLM
+langchain>=0.3
+langchain-core
+langchain-google-genai
+langchain-chroma
+langgraph>=0.2
+langchain-text-splitters
+
+# Reranker (CRAG & hallucination check)
+FlagEmbedding>=1.2.0
+
+# MCP (web search)
+langchain-mcp-adapters
+
+# App
+streamlit
+python-dotenv
+PyYAML
+pydantic>=2.0
+
+# Optional: nest_asyncio if running MCP in sync context
+nest_asyncio
+
+# Optional: PostgreSQL 长期记忆（在 .env 中设置 DATABASE_URL 后生效）
+psycopg2-binary
