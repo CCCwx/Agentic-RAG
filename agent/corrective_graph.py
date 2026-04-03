@@ -246,23 +246,61 @@ def stage3_web_search(state: RAGState) -> RAGState:
     web_results = web_search(query_list)
     decision = state.get("crag_decision", "Incorrect")
     refined = state.get("refined_context", "")
+    # Web Search 可能因接口/网络导致返回空：为空时回退策略
+    if not web_results:
+        warning = "材料不足（网络检索失败或无结果），可能有误，请详细辨别。"
+        if decision == "Ambiguous":
+            # Ambiguous 已经有向量库 refinement，直接用它并附加提示
+            new_docs = state.get("documents", [])
+            new_context = (refined + "\n\n" + warning).strip() if refined else warning
+        else:
+            # Incorrect 时向量库资料不可靠且 web 为空：不编造，直接用提示（让生成阶段说明材料不足）
+            new_docs = []
+            new_context = warning
+        return {
+            **state,
+            "web_results": [],
+            "documents": new_docs,
+            "refined_context": new_context,
+            "need_web_search": False,
+            "next_stage": "generate",
+        }
+
+    # web_results 有 1/2 条时：若两条高度相似则去重一条（用 reranker 近似相似度）
+    web_kept = web_results
+    if len(web_results) >= 2:
+        try:
+            reranker = _get_reranker()
+            a = web_results[0].page_content
+            b = web_results[1].page_content
+            # 用双向 (a,b) 与 (b,a) 的平均分近似相似度
+            sim_scores = reranker.compute_scores([(a, b), (b, a)], normalize=True)
+            sim = sum(sim_scores) / len(sim_scores) if sim_scores else 0.0
+            sys.stdout.write(f"[终端] Web 结果相似度(近似): {sim}\n")
+            sys.stdout.flush()
+            if sim >= 0.7:
+                web_kept = [web_results[0]]
+        except Exception as e:
+            logger.warning(f"[stage3_web_search] web dedupe failed: {e}")
+
     # 对 web results 做 knowledge refinement，控制上下文长度（LLM 调用，可能较慢）
     sys.stdout.write("\n[终端] 阶段3 正在对网络结果做知识提炼（LLM 可能较慢，请稍候）...\n")
     sys.stdout.flush()
-    refined_web = refine_documents(query, web_results) if web_results else ""
+    refined_web = refine_documents(query, web_kept)
     sys.stdout.write("[终端] 阶段3 知识提炼完成\n")
     sys.stdout.flush()
-    # Path A: Incorrect -> context 只用提炼后的网络结果
-    # Path B: Ambiguous (or backtrack) -> context = 向量库提炼 + 网络结果提炼
+
+    # Path A: Incorrect -> context 只用提炼后的网络结果（documents 只保留 web 原始数据）
+    # Path B: Ambiguous -> context = 向量库提炼 + 网络结果提炼
     if decision == "Incorrect":
-        new_docs = web_results #这里的文档列表是网络查询到的文档列表（没有进行精炼的raw数据）
+        new_docs = web_kept
         new_context = refined_web
     else:
-        new_docs = state.get("documents", []) + web_results
+        new_docs = state.get("documents", []) + web_kept
         new_context = (refined + "\n\n" + refined_web).strip() if refined_web else refined
     return {
         **state,
-        "web_results": web_results,
+        "web_results": web_kept,
         "documents": new_docs,
         "refined_context": new_context,
         "need_web_search": False,
@@ -350,14 +388,28 @@ def stage5_utility_check(state: RAGState) -> RAGState:
     if sim >= QUERY_SIM_THRESHOLD:
         # Path B: web search only, then generate
         web_results = web_search([query, rew2])
-        refined = state.get("refined_context", "") + "\n\n" + "\n\n".join(d.page_content for d in web_results)
+        # 对 web results 做去重与精炼，避免上下文膨胀
+        web_kept = web_results
+        if len(web_results) >= 2:
+            try:
+                reranker = _get_reranker()
+                a = web_results[0].page_content
+                b = web_results[1].page_content
+                sim_scores = reranker.compute_scores([(a, b), (b, a)], normalize=True)
+                web_sim = sum(sim_scores) / len(sim_scores) if sim_scores else 0.0
+                if web_sim >= 0.7:
+                    web_kept = [web_results[0]]
+            except Exception as e:
+                logger.warning(f"[stage5_utility_check] web dedupe failed: {e}")
+        refined_web = refine_documents(query, web_kept) if web_kept else ""
+        refined = (state.get("refined_context", "") + "\n\n" + refined_web).strip() if refined_web else state.get("refined_context", "")
         return {
             **state,
             "utility": utility,
             "rewritten_query_2": rew2,
             "query_sim": sim,
             "overall_generate_counter": overall + 1,
-            "documents": state.get("documents", []) + web_results,
+            "documents": state.get("documents", []) + web_kept,
             "refined_context": refined,
             "next_stage": "generate",
         }
@@ -372,7 +424,6 @@ def stage5_utility_check(state: RAGState) -> RAGState:
         "rewritten_query_1": rew2,
         "next_stage": "retrieve",
     }
-
 
 # --- Build graph ---
 def build_rag_graph():
