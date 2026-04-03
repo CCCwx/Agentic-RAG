@@ -5,4 +5,7 @@ User Question: {query}
 Reference Documents:
 {context}
 
+Additional constraint:
+- If there are duplicated or highly similar bullet points, merge them and do NOT output repetitive bullets.
+
 Output format: plain text bullet points, one per line, each starting with "- ".
