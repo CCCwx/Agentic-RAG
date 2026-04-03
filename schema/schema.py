@@ -2,14 +2,14 @@
 Schema for enforcing structured agent / LLM outputs in the RAG workflow.
 """
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Literal
 from langchain_core.prompts import PromptTemplate
 
 
 # --- Stage 1: Intent routing ---
 class IntentResponse(BaseModel):
     """Intent classification: No Retrieval | Retrieval Needed."""
-    response: str = Field(
+    response: Literal["No Retrieval", "Retrieval Needed"] = Field(
         ...,
         description="One of: 'No Retrieval' or 'Retrieval Needed'."
     )
@@ -29,8 +29,18 @@ class ExpandedQueriesResponse(BaseModel):
 # --- Stage 5: Utility check ---
 class UtilityResponse(BaseModel):
     """Whether the answer is useful for the user's question."""
-    response: str = Field(
+    response: Literal["Useful", "Not Useful"] = Field(
         ...,
         description="One of: 'Useful' or 'Not Useful'."
     )
+
+# --- Knowledge refinement (bullets) ---
+class RefinedBulletsResponse(BaseModel):
+    """Refined bullet points extracted from documents."""
+    bullets: List[str] = Field(
+        ...,
+        min_length=1,
+        description="List of concise bullet point strings.",
+    )
+
 
