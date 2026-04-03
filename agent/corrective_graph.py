@@ -472,6 +472,7 @@ def stage5_utility_check(state: RAGState) -> RAGState:
         "next_stage": "retrieve",
     }
 
+
 # --- Build graph ---
 def build_rag_graph():
     workflow = StateGraph(RAGState)
