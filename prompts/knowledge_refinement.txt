@@ -8,4 +8,8 @@ Reference Documents:
 Additional constraint:
 - If there are duplicated or highly similar bullet points, merge them and do NOT output repetitive bullets.
 
-Output format: plain text bullet points, one per line, each starting with "- ".
+Output format (STRICT):
+- Return a JSON object with a single key "bullets" whose value is a list of bullet point strings. For examaple, {"bullets":["clause1","clause2","clause3"]}
+- Do NOT include any other keys.
+- Do NOT wrap the JSON in markdown fences.
+
