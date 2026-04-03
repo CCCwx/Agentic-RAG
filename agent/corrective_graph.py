@@ -22,8 +22,9 @@ from utils.similarity import query_similarity
 from utils.knowledge_refinement import refine_documents
 from utils.retrieval_utils import multi_query_retrieve
 from agent.agent_tool.web_search import web_search
-from schema.schema import IntentResponse, ExpandedQueriesResponse
+from schema.schema import IntentResponse, ExpandedQueriesResponse, UtilityResponse
 from utils.logger_handler import logger
+from utils.structured_call import invoke_structured_with_retry
 import json
 import sys
 
@@ -149,8 +150,22 @@ def stage1_routing(state: RAGState) -> RAGState:
     chat_history = state.get("chat_history") or "(No chat history.)"
     prompt_text = load_intent_routing_prompt()
     prompt = PromptTemplate.from_template(prompt_text)
-    chain = prompt | chat_model.with_structured_output(IntentResponse)
-    result = chain.invoke({"query": query, "chat_history": chat_history})
+    inputs = {"query": query, "chat_history": chat_history}
+
+    def _intent_fallback() -> IntentResponse:
+        raw = (prompt | chat_model | StrOutputParser()).invoke(inputs) or ""
+        s = str(raw).lower()
+        resp = "No Retrieval" if "no retrieval" in s else "Retrieval Needed"
+        return IntentResponse(response=resp)  # type: ignore[arg-type]
+
+    result = invoke_structured_with_retry(
+        prompt=prompt,
+        model=chat_model,
+        schema=IntentResponse,
+        inputs=inputs,
+        retries=1,
+        fallback=_intent_fallback,
+    )
     intent = "No Retrieval" if result and "No Retrieval" in (result.response or "") else "Retrieval Needed"
     if intent == "No Retrieval":
         return {
@@ -164,12 +179,29 @@ def stage1_routing(state: RAGState) -> RAGState:
     # Query expansion: 1-2 rewritten queries
     exp_prompt = load_query_expansion_prompt()
     exp_template = PromptTemplate.from_template(exp_prompt)
-    try:
-        exp_chain = exp_template | chat_model.with_structured_output(ExpandedQueriesResponse)
-        result = exp_chain.invoke({"query": query})
-        queries = (result.queries or [query]) if result else [query]
-    except Exception:
-        queries = [query]
+
+    def _expansion_fallback() -> ExpandedQueriesResponse:
+        raw = (exp_template | chat_model | StrOutputParser()).invoke({"query": query}) or ""
+        try:
+            obj = json.loads(raw) if isinstance(raw, str) else {}
+            qs = obj.get("queries") if isinstance(obj, dict) else None
+            if isinstance(qs, list) and qs:
+                cleaned = [str(x).strip() for x in qs[:2] if str(x).strip()]
+                if cleaned:
+                    return ExpandedQueriesResponse(queries=cleaned)
+        except Exception:
+            pass
+        return ExpandedQueriesResponse(queries=[query])
+
+    exp_result = invoke_structured_with_retry(
+        prompt=exp_template,
+        model=chat_model,
+        schema=ExpandedQueriesResponse,
+        inputs={"query": query},
+        retries=1,
+        fallback=_expansion_fallback,
+    )
+    queries = (exp_result.queries or [query]) if exp_result else [query]
     if not isinstance(queries, list):
         queries = [queries] if queries else [query]
     query_list = [query] + [q for q in queries if q and str(q).strip() and str(q).strip() != query][:1]
@@ -364,9 +396,24 @@ def stage5_utility_check(state: RAGState) -> RAGState:
     answer = state["answer"]
     prompt_text = load_utility_check_prompt()
     prompt = PromptTemplate.from_template(prompt_text)
-    chain = prompt | chat_model | StrOutputParser()
-    out = chain.invoke({"query": query, "answer": answer})
-    utility = "Useful" if out and "Useful" in (out or "") else "Not Useful"
+
+    inputs = {"query": query, "answer": answer}
+
+    def _utility_fallback() -> UtilityResponse:
+        raw = (prompt | chat_model | StrOutputParser()).invoke(inputs) or ""
+        resp = "Useful" if "Useful" in str(raw) else "Not Useful"
+        return UtilityResponse(response=resp)  # type: ignore[arg-type]
+
+    util_result = invoke_structured_with_retry(
+        prompt=prompt,
+        model=chat_model,
+        schema=UtilityResponse,
+        inputs=inputs,
+        retries=1,
+        fallback=_utility_fallback,
+    )
+    utility = "Useful" if (util_result.response or "").strip() == "Useful" else "Not Useful"
+
     overall = state.get("overall_generate_counter", 0)
     if utility == "Useful":
         return {**state, "utility": utility, "final_answer": answer, "next_stage": "end"}
